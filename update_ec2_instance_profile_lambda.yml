@@ -1,0 +1,109 @@
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creates a Lambda function to replace EC2 instance profile triggered via SNS topic
+
+Resources:
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Lambda function to update ec2 instance profile
+      FunctionName: EC2ReplaceInstanceProfileLambda
+      Role: !GetAtt LambdaRole.Arn
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          ec2_client = boto3.client('ec2')
+          ec2_resource = boto3.resource('ec2')
+          def lambda_handler(event, context):
+              print(event)
+              message = json.loads(event['Records'][0]['Sns']['Message'])
+              print("instance_id: {}".format(message['instance-id']))
+              instance_id = message['instance-id']
+              # Get tag
+              ec2instance = ec2_resource.Instance(instance_id)
+              for tag in ec2instance.tags:
+                  if tag["Key"] == 'InstanceProfileName':
+                      instanceProfile = tag["Value"]
+                      break
+              if not instanceProfile:
+                  print('No InstanceProfile tag found for instance: {}'.format(instance_id))
+                  return
+              # Get existing instance profile association
+              describe_response = ec2_client.describe_iam_instance_profile_associations(
+                  Filters=[
+                      {
+                          'Name': 'instance-id',
+                          'Values': [instance_id]
+                      }
+                  ]
+              )
+              print('describe_response: {}'.format(describe_response))
+              associations = describe_response['IamInstanceProfileAssociations']
+              association_id = associations[0]['AssociationId']
+              # replace instance profile
+              replace_response = ec2_client.replace_iam_instance_profile_association(
+                  IamInstanceProfile={
+                      'Name': instanceProfile
+                  },
+                  AssociationId=association_id
+              )
+              print('replace_response: {}'.format(replace_response))
+
+  LambdaTrigger:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: UpdateInstanceProfileTopic
+      Subscription:
+        - Endpoint: !GetAtt Lambda.Arn
+          Protocol: lambda
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Lambda
+      Principal: sns.amazonaws.com
+      Action: lambda:InvokeFunction
+      SourceArn: !Ref LambdaTrigger
+  
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2ReplaceInstanceProfileRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: EC2ReplaceInstanceProfilePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/*"
+              - Effect: Allow
+                Action: 
+                  - ec2:ReplaceIamInstanceProfileAssociation
+                Resource: !Sub "arn:aws:ec2:*:${AWS::AccountId}:instance/*"
+              - Effect: Allow
+                Action:
+                  - ec2:DescribeIamInstanceProfileAssociations
+                  - ec2:DescribeTags
+                  - ec2:DescribeInstances
+                Resource: "*"
+
+Outputs:
+  SNSTopicArn:
+    Description: SNS topic arn for the Lambda trigger
+    Value: !Ref LambdaTrigger
+    Export:
+      Name: UpdateEC2InstanceProfileSNSTopicArn

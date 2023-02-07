@@ -1,0 +1,93 @@
+
+
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create EC2 instance with userdata to demonstrate replacing IAM role
+
+Parameters:
+
+  LatestAmiId:
+    Description: Latest Amazon Linux 2 Image Id
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  SubnetId:
+    Description: Id of the subnet where the instance runs
+    Type: AWS::EC2::Subnet::Id
+
+
+Resources:
+
+  EC2ProvisioningRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: Role used to provision EC2 instances
+      Policies:
+        - PolicyName: InstanceRoleInlinePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: 'sns:publish'
+                Resource: !ImportValue UpdateEC2InstanceProfileSNSTopicArn
+      RoleName: EC2ProvisioningRole
+
+  EC2ProvisioningRoleInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2ProvisioningRole
+
+  EC2RunningRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Description: Role used to provision EC2 instances
+      RoleName: EC2RunningRole
+
+  EC2RunningRoleInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EC2RunningRole
+
+  Ec2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref LatestAmiId
+      InstanceType: t2.micro
+      IamInstanceProfile: !Ref EC2ProvisioningRoleInstanceProfile
+      SubnetId: !Ref SubnetId
+      UserData:
+        Fn::Base64:
+          !Sub 
+            - |
+              #!/bin/bash
+              instance_id=$(wget -q -O- http://169.254.169.254/latest/meta-data/instance-id)
+              region=$(wget -q -O- http://169.254.169.254/latest/meta-data/placement/region)
+              aws sns publish --topic-arn ${TOPICARN} --message "{\"instance-id\":\"$instance_id\"}" --region ${AWS::Region}
+            - TOPICARN: !ImportValue UpdateEC2InstanceProfileSNSTopicArn
+      Tags:
+        - Key: Name
+          Value: update_ec2_role_lambda_test
+        - Key: InstanceProfileName
+          Value: !Ref EC2RunningRoleInstanceProfile
+
