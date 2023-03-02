@@ -18,7 +18,7 @@ The purpose of this Lambda function is to update the instance profile of any EC2
 ### Additional Information
 
 * The EC2 instance profile replacement Lambda looks for a tag named **InstanceProfileName** on the instance.  If the tag is not found when the Lambda is run, the Lambda will gracefully exit and the existing instance profile will not be replaced.
-* The Lambda function is restricted to IAM roles that start with EC2InstanceProfile.  To open the function to more roles, add addtional resources under https://github.com/aws-samples/ec2-instance-profile-replacement-lambda/blob/f01b7f960f6f7cd35903c16ce8f69c7717c7d2f3/update_ec2_instance_profile_lambda.yml#L89-L96
+* The Lambda function is restricted to IAM roles that start with EC2InstanceProfile.  To open the function to more roles, add addtional resources under https://github.com/aws-samples/ec2-instance-profile-replacement-lambda/blob/main/update_ec2_instance_profile_lambda.yml#L89-L96
 * The Lambda logs can be found in the **/aws/lambda/EC2ReplaceInstanceProfileLambda** log group in Cloudwatch.
 
 ## Security
