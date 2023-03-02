@@ -38,7 +38,7 @@ Resources:
               - Effect: Allow
                 Action: 'sns:publish'
                 Resource: !ImportValue UpdateEC2InstanceProfileSNSTopicArn
-      RoleName: EC2ProvisioningRole
+      RoleName: EC2InstanceProfileProvisioningRole
 
   EC2ProvisioningRoleInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
@@ -60,7 +60,7 @@ Resources:
             Action:
               - 'sts:AssumeRole'
       Description: Role used to provision EC2 instances
-      RoleName: EC2RunningRole
+      RoleName: EC2InstanceProfileRunningRole
 
   EC2RunningRoleInstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'

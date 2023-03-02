@@ -10,16 +10,16 @@ The purpose of this Lambda function is to update the instance profile of any EC2
 
 1. Log into AWS Console 
 2. Deploy the update_ec2_instance_profile_lambda.yml Cloudformation template.  This will create the Lambda function, the IAM role associated with the function and the SNS topic to trigger the Lambda function.
-3. Deploy the create_ec2_instance.yml Cloudformation template.  This will create an EC2 instance using the latest Amazon Linux 2 AMI and two IAM roles.  EC2ProvisioningRole will be used to create the EC2 instance and EC2RunningRole will be used after the instance is running. 
-4. During EC2 creation, observe that the instance profile used is EC2ProvisioningRole and after the instance is running, the profile changes to EC2RunningRole.
+3. Deploy the create_ec2_instance.yml Cloudformation template.  This will create an EC2 instance using the latest Amazon Linux 2 AMI and two IAM roles.  EC2InstanceProfileProvisioningRole will be used to create the EC2 instance and EC2InstanceProfileRunningRole will be used after the instance is running. 
+4. During EC2 creation, observe that the instance profile used is EC2InstanceProfileProvisioningRole and after the instance is running, the profile changes to EC2InstanceProfileRunningRole.
 
 ![EC2 Cloudformation parameters](images/create-ec2-instance.png "Template Parameters")
 
 ### Additional Information
 
-The EC2 instance profile replacement Lambda looks for a tag named **InstanceProfileName** on the instance.  If the tag is not found when the Lambda is run, the Lambda will gracefully exit and the existing instance profile will not be replaced.
-
-The Lambda logs can be found in the **/aws/lambda/EC2ReplaceInstanceProfileLambda** log group in Cloudwatch.
+* The EC2 instance profile replacement Lambda looks for a tag named **InstanceProfileName** on the instance.  If the tag is not found when the Lambda is run, the Lambda will gracefully exit and the existing instance profile will not be replaced.
+* The Lambda function is restricted to IAM roles that start with EC2InstanceProfile.  To open the function to more roles, add addtional resources under https://github.com/aws-samples/ec2-instance-profile-replacement-lambda/blob/f01b7f960f6f7cd35903c16ce8f69c7717c7d2f3/update_ec2_instance_profile_lambda.yml#L89-L96
+* The Lambda logs can be found in the **/aws/lambda/EC2ReplaceInstanceProfileLambda** log group in Cloudwatch.
 
 ## Security
 
